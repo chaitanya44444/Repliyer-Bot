@@ -46,6 +46,15 @@ class RepliyBot(discord.Client): #fun fact name felt more funny this way\
          await self.tree.sync()
 
 bot=RepliyBot()
+#Realised this would cause issues later with message/interaction diff
+
+'''
+
+def getdcinfo(interaction):
+    return{
+    "guild_name":interaction.guild.name if interaction.guild else"DM",
+    "guild_id":str(interaction.guild.id) if interaction.guild else"DM", 
+   '''
 
 # AI Handling Part
 def aiconvo():
@@ -53,7 +62,7 @@ def aiconvo():
 
 def gemini():
     return ""
-def hf(prompt:str,system_prompt:str,interaction=None,message=None):
+def hf(prompt:str,interaction=None,message=None):
     
     if not hf_api: return None
     
@@ -65,6 +74,17 @@ def hf(prompt:str,system_prompt:str,interaction=None,message=None):
     }
     
     modelname="meta-llama/Meta-Llama-3-8B-Instruct"
+    
+    payload={
+        
+        
+    "model":modelname,
+    "messages":[{"role":"system","content":"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic."},
+                {"role":"user","content":prompt}],
+    "temperature": 0.7,
+    "max_tokens": 1020,
+    "stream": False
+    }
     
 
 def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str = "DM",channel_name: str = "DM",channel_id: str = "DM",user: str = "Unknown"):
