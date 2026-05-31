@@ -7,12 +7,17 @@ import csv,json,os
 from datetime import datetime
 import google.generativeai
 import requests
+import asyncio
+from dotenv import load_dotenv
+load_dotenv()
 
 # TOKENS/API KEYS
-gpai=""
-discordtoken=""
-hf_api=""
-geminiapi=""
+load_dotenv()
+discordtoken = os.getenv("discordtoken")
+hf_api = os.getenv("hf_api")
+
+
+
 
 # SETTING UP DISCORD
 Intents=discord.Intents.default()
@@ -20,36 +25,40 @@ Intents.messages = True
 Intents.dm_messages = True
 Intents.guilds = True
 Intents.message_content = True
+
+
 # Files
 acces="acces.csv"
-logs="" #incase of misuse/inapropriate useage
+logs="logs.csv" #incase of misuse/inapropriate useage
 
 #File Functions
+
+
+#Loads access
 def lacces():
+    data={}
     try:
         with open(acces,newline="") as f:
-            return {int(r[0]) for r in csv.reader(f)}
-    except: return set()
+            for gid, uid in csv.reader(f):
+                gid ,uid= int(gid) ,int(uid)
+                if gid not in data: data[gid] = set()
 
-def racces(user_id):
-    try:
-        with open(acces,"w",newline="") as f:
-            writer=csv.writer(f)
-            writer.writerow([user_id])
-    except: print("hi")
+                data[gid].add(uid)
+        
+    except: pass
+    return data
 
-# Discord Setup
-class RepliyBot(discord.Client): #fun fact name felt more funny this way\
-    def __init__(self):
-        super().__init__(intents=Intents)
-        self.tree = app_commands.CommandTree(self)
-    async def setup_hook(self):
-         await self.tree.sync()
-
-bot=RepliyBot()
-#Realised this would cause issues later with message/interaction diff
-
+# De-appreciated Functions
 '''
+
+def racces(guild_id, user_id):
+    try:
+        with open(acces, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([guild_id, user_id])
+    except: print("error")
+    
+
 
 def getdcinfo(interaction):
     return{
@@ -57,14 +66,23 @@ def getdcinfo(interaction):
     "guild_id":str(interaction.guild.id) if interaction.guild else"DM", 
    '''
 
+#Discord Setup
+
+class RepliyBot(discord.Client): #fun fact name felt more funny this way\
+    def __init__(self):
+        super().__init__(intents=Intents)
+        self.tree = app_commands.CommandTree(self)
+    async def setup_hook(self):
+        print("Setup Bot")
+         await self.tree.sync()
+
+bot=RepliyBot()
+#Realised this would cause issues later with message/interaction diff
+
+
+
 # AI Handling Part
-def aiconvo():
-    return ""
-
-def gemini():
-    return ""
-
-def hf(prompt:str,interaction=None,message=None):
+def aiconvo(prompt:str,interaction=None,message=None):
     
     
     # Get info for dc
@@ -96,7 +114,18 @@ def hf(prompt:str,interaction=None,message=None):
                 channel_id = str(message.channel.id)
 
     except Exception:
-        pass     
+        pass   
+    logit(prompt,hf(),"qwen",guild_name,guild_id,channel_name,channel_id,user_name)
+
+#   hf("You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {guild_name} in channel of{channel_name}  talking to user and user is {user_name}")
+
+def gemini():
+    return ""
+
+
+
+async def hf(a,systemp,prompt):
+  
     if not hf_api: return None
     
     url = "https://router.huggingface.co/v1/chat/completions"
@@ -113,21 +142,29 @@ def hf(prompt:str,interaction=None,message=None):
         
     "model":modelname,
     "messages":[
-        {"role":"system","content":"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {guild_name} in channel of{channel_name}  talking to user and user is {user_name}"},
+        {"role":"system","content":a},
                 {"role":"user","content":prompt}],
     "temperature": 0.7,
     "max_tokens": 1020,
     "stream": False
     }
-    req = requests.post(
+    req = await asyncio.to_thread(
+    requests.post,
     url,
     headers=headers,
-    json=payload
-)
-    
-    response=req.json()["choices"][0]["message"]["content"]
-    logit(prompt,response,modelname,guild_name,guild_id,channel_name,channel_id,user_name)
-    return response
+    json=payload,
+    timeout=90
+    )
+
+    if req.status_code != 200:
+        print(req.text)
+        return "error"
+
+    return req.json()["choices"][0]["message"]["content"]
+   
+   
+   
+  #Logging 
     
 def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str = "DM",channel_name: str = "DM",channel_id: str = "DM",user: str = "Unknown"):
     with open(logs,"a",newline="") as f:
@@ -136,7 +173,7 @@ def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str =
                 "timestamp","model","server_name","server_id","channel_name","channel_id","user","prompt","final_output"])
 
         writer.writerow([
-            datetime.isoformat(),
+            datetime.now().isoformat(),
             model,
             guild_name,
             guild_id,
@@ -146,4 +183,64 @@ def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str =
             prompt,
             output
         ])
+@bot.event
+async def on_message(message):
+    print("hi")
+    if message.author.bot:
+        return
+
+    enabled = lacces()
+    guid=message.guild.id
+    uid=message.user.id
+    if guid not in enabled:return
+    if uid not in enabled: return
+    print("hiii")
+    history = []
+
+    current = message
+
+    while current.reference:
+        try:
+            parent = await current.channel.fetch_message(
+                current.reference.message_id
+            )
+
+            history.append(
+                f"{parent.author}: {parent.content}"
+            )
+
+            current = parent
+
+        except Exception:
+            break
+
+    history.reverse()
+
+    history.append(
+        f"{message.author}: {message.content}"
+    )
+
+    prompt = "\n".join(history)
+
+    async with message.channel.typing():
+        try:
+            response = await  hf(
+                "You are a helpful AI made by Chaitanya.",
+                "",
+                prompt
+            )
+
+            if not response:
+                response = "Model returned no response."
+
+            if len(response) > 2000:
+                response = response[:1990] + "..."
+
+            await message.reply(response)
+
+        except Exception as e:
+            await message.reply(f"Error: {e}")
+
+bot.run(discordtoken)   
         
+      
