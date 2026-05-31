@@ -6,6 +6,7 @@ import random
 import csv,json,os
 from datetime import datetime
 import google.generativeai
+import requests
 
 # TOKENS/API KEYS
 gpai=""
@@ -62,8 +63,40 @@ def aiconvo():
 
 def gemini():
     return ""
+
 def hf(prompt:str,interaction=None,message=None):
     
+    
+    # Get info for dc
+    guild_name = "DM"
+    guild_id = "DM"
+    channel_name = "DM"
+    channel_id = "DM"
+    user_name = "Null"
+    try:
+        if interaction:
+            user_name=str(interaction.user)
+            if interaction.guild:
+                guild_name=interaction.guild.name
+                guild_id=str(interaction.guild.id)
+                channel_name=interaction.channel.name
+                channel_id=str(interaction.channel.id)
+            else:
+                channel_name="DM"
+                channel_id=str(interaction.channel_id)
+        elif message:
+            user_name = str(message.author)
+            if message.guild:
+                guild_name = message.guild.name
+                guild_id = str(message.guild.id)
+                channel_name = message.channel.name
+                channel_id = str(message.channel.id)
+            else:
+                channel_name = "DM"
+                channel_id = str(message.channel.id)
+
+    except Exception:
+        pass     
     if not hf_api: return None
     
     url = "https://router.huggingface.co/v1/chat/completions"
@@ -73,20 +106,29 @@ def hf(prompt:str,interaction=None,message=None):
         "Content-Type": "application/json"
     }
     
-    modelname="meta-llama/Meta-Llama-3-8B-Instruct"
+    modelname="google/gemma-4-31B-it"
     
     payload={
         
         
     "model":modelname,
-    "messages":[{"role":"system","content":"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic."},
+    "messages":[
+        {"role":"system","content":"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {guild_name} in channel of{channel_name}  talking to user and user is {user_name}"},
                 {"role":"user","content":prompt}],
     "temperature": 0.7,
     "max_tokens": 1020,
     "stream": False
     }
+    req = requests.post(
+    url,
+    headers=headers,
+    json=payload
+)
     
-
+    response=req.json()["choices"][0]["message"]["content"]
+    logit(prompt,response,modelname,guild_name,guild_id,channel_name,channel_id,user_name)
+    return response
+    
 def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str = "DM",channel_name: str = "DM",channel_id: str = "DM",user: str = "Unknown"):
     with open(logs,"a",newline="") as f:
         writer=csv.writer(f)
