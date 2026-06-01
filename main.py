@@ -1,5 +1,4 @@
 import os
-import re
 from discord import app_commands
 import discord
 import random
@@ -30,7 +29,7 @@ Intents.message_content = True
 # Files
 acces="acces.csv"
 logs="logs.csv" #incase of misuse/inapropriate useage
-
+toggle="toggle.csv"# form of serverid,on/off
 #File Functions
 
 
@@ -73,7 +72,6 @@ class RepliyBot(discord.Client): #fun fact name felt more funny this way\
         super().__init__(intents=Intents)
         self.tree = app_commands.CommandTree(self)
     async def setup_hook(self):
-        print("Setup Bot")
          await self.tree.sync()
 
 bot=RepliyBot()
@@ -124,18 +122,17 @@ def gemini():
 
 
 
-async def hf(a,systemp,prompt):
+async def hf(a,systemp,prompt,modelname="google/gemma-4-31B-it",apikey=hf_api):
   
     if not hf_api: return None
     
     url = "https://router.huggingface.co/v1/chat/completions"
    
     headers={
-        "Authorization": f"Bearer {hf_api}",
+        "Authorization": f"Bearer {apikey}",
         "Content-Type": "application/json"
     }
     
-    modelname="google/gemma-4-31B-it"
     
     payload={
         
@@ -189,11 +186,13 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    enabled = lacces()
     guid=message.guild.id
-    uid=message.user.id
-    if guid not in enabled:return
-    if uid not in enabled: return
+    uid=message.author.id
+    allowed = lacces()
+    if message.author.guild_permissions.administrator: pass
+
+    elif uid not in allowed[guid] or guid not in allowed:
+        return
     print("hiii")
     history = []
 
@@ -215,23 +214,20 @@ async def on_message(message):
             break
 
     history.reverse()
-
-    history.append(
-        f"{message.author}: {message.content}"
-    )
+    history.append( f"{message.author}: {message.content}" # tells context
+)
 
     prompt = "\n".join(history)
 
     async with message.channel.typing():
         try:
             response = await  hf(
-                "You are a helpful AI made by Chaitanya.",
-                "",
+                "You are a helpful AI made by Chaitanya.You are to act knowledgable and funny and know about memes and cultural references.You woll reply in less then 500 charascters and in discord foramat","",
                 prompt
             )
 
             if not response:
-                response = "Model returned no response."
+                response = "erorr with response"
 
             if len(response) > 2000:
                 response = response[:1990] + "..."
