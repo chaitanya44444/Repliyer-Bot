@@ -1,20 +1,20 @@
-import os
 from discord import app_commands
-import discord
-import random
-import csv,json,os
+import csv,discord,os
 from datetime import datetime
-import google.generativeai
 import requests
 import asyncio
 from dotenv import load_dotenv
+
+
 load_dotenv()
 
 # TOKENS/API KEYS
 load_dotenv()
 discordtoken = os.getenv("discordtoken")
 hf_api = os.getenv("hf_api")
-
+if (not discordtoken) or (not hf_api):
+    print("MISSING DETAILS -hf_api or discordtoken")
+    
 
 # SETTING UP DISCORD
 Intents=discord.Intents.default()
@@ -25,10 +25,14 @@ Intents.message_content = True
 
 
 # Files
-acces="acces.csv"
-logs="logs.csv" #incase of misuse/inapropriate useage
-togglefile="toggle.csv"# form of serverid,on/off
-configfile="config.csv" # serverid,modelname,apikey
+acces="site/acces.csv"
+logs="site/logs.csv" #incase of misuse/inapropriate useage
+togglefile="site/toggle.csv"# form of serverid,on/off
+configfile="site/config.csv" # serverid,modelname,apikey
+
+
+
+
 #File Functions
 
 
@@ -46,15 +50,26 @@ def lacces():
     except: pass
     return data
 
+
+
+
+
 def ltoggle():
     try:
         with open(togglefile) as f:
             return {int(line.strip()) for line in f if line.strip()}
     except: return set()
+    
+    
+    
+    
 def stoggle(c):
     with open(togglefile,"w") as f:
         for gid in c:
             f.write(f"{gid}\n")
+            
+            
+            
             
 def lconfig():
     d={}
@@ -64,6 +79,9 @@ def lconfig():
                 d[int(gid)]={"model":model,"apikey":key,"prompt":prompt}
     except: pass
     return d
+
+
+
 def sconfig(gid,model,key,prompt):
     d=lconfig()
     d[gid]={"model":model,"apikey":key,"prompt":prompt}
@@ -96,6 +114,7 @@ def getdcinfo(interaction):
     "guild_id":str(interaction.guild.id) if interaction.guild else"DM", 
    '''
 
+
 #Discord Setup
 
 class RepliyBot(discord.Client): #fun fact name felt more funny this way\
@@ -105,8 +124,10 @@ class RepliyBot(discord.Client): #fun fact name felt more funny this way\
     async def setup_hook(self):
          await self.tree.sync()
 
+
+
+
 bot=RepliyBot()
-#Realised this would cause issues later with message/interaction diff
 
 
 
@@ -146,14 +167,14 @@ def aiconvo(prompt:str,interaction=None,message=None):
         pass   
     logit(prompt,hf(),"qwen",guild_name,guild_id,channel_name,channel_id,user_name)
 
-#   hf("You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {guild_name} in channel of{channel_name}  talking to user and user is {user_name}")
+#   
 
 
 
 
 
 async def hf(a,systemp,prompt,modelname="google/gemma-4-31B-it",apikey=hf_api):
-  
+
     if not hf_api: return None
     
     url = "https://router.huggingface.co/v1/chat/completions"
@@ -212,11 +233,20 @@ def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str =
         ])
 @bot.event
 async def on_message(message):
+
+    
     print("hi")
     if message.author.bot:
         return
 
     guid=message.guild.id
+    configes=lconfig()
+    
+    configer=configes.get(guid)
+    if configer:
+        modelc = configer["model"]
+        apikeyc = configer["apikey"]
+
     uid=message.author.id
     allowed = lacces()
     enabled = ltoggle()
@@ -226,6 +256,7 @@ async def on_message(message):
     if message.author.guild_permissions.administrator: pass
 
     elif uid not in allowed.get(guid, set()): return
+    sysprompt=f"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {message.guild.name} in channel of{message.channel.name}  talking to user and user is {message.author.name}"
 
     print("hiii")
     history = []
@@ -255,13 +286,20 @@ async def on_message(message):
 
     async with message.channel.typing():
         try:
-            response = await  hf(
-                "You are an ai made by chaitanya.You are to act knowledgable and funny and know about memes and cultural references.You woll reply in less then 500 charascters and in discord foramat. MSG HAS TO BE TEXT TYPE NOT.A FULL PHARSAGRAP/ESSAY AT MAX 400 CHARACTERS PER UNLESS EXPICIILTY ASKED PLS  DONT SEND LONG MSGS","",
+            if configer:
+                response = await  hf(
+                    sysprompt,"",
+                    prompt,
+                    modelname=modelc,
+                    apikey=apikeyc
+                )
+            else:
+                response = await  hf(
+                sysprompt,"",
                 prompt
             )
 
-            if not response:
-                response = "erorr with response"
+            if not response:response = "erorr with response"
 
             if len(response) > 500: response = response[:500] + "bot tried giving to much msg :c"
 
@@ -278,23 +316,53 @@ async def on_message(message):
 async def giveacc(interaction: discord.Interaction, user: discord.User):
     with open(acces,"a",newline="") as f:
         csv.writer(f).writerow([interaction.guild.id,user.id])
-        await interaction.response.send_message("Done")
+        await interaction.response.send_message(f"gave access to {user.name}")
         
+        
+@bot.tree.context_menu(name="Give ACCES")
+@app_commands.checks.has_permissions(administrator=True)
+async def giveacc(interaction: discord.Interaction, user: discord.User):
+    with open(acces,"a",newline="") as f:
+        csv.writer(f).writerow([interaction.guild.id,user.id])
+        await interaction.response.send_message(f"gave access to {user.name}")
+        
+      
         
 @bot.tree.command(name="removeacc",description="removes acces")
 @app_commands.checks.has_permissions(administrator=True)
 async def removeacc(interaction: discord.Interaction, user: discord.User):
+    a=False
     r=[]
     with open(acces,newline="") as f:
         for gid,uid in csv.reader(f):
             if not (int(gid) == interaction.guild.id and int(uid) == user.id):
                 r.append([gid,uid])
             else:
-                await interaction.response.send_message("They didnt have")
+                a=True
     with open(acces,"w",newline="") as f:
         csv.writer(f).writerows(r)
-    await interaction.response.send_message("Done")
- 
+    
+    await interaction.response.send_message(f"remove access from {user.name}"if not a else "didnt have anw")
+    
+    
+@bot.tree.context_menu(name="Remove Access")
+@app_commands.checks.has_permissions(administrator=True)
+async def removeacc(interaction: discord.Interaction, user: discord.User):
+    r=[]
+    a=False
+    with open(acces,newline="") as f:
+        for gid,uid in csv.reader(f):
+            if not (int(gid) == interaction.guild.id and int(uid) == user.id):
+                r.append([gid,uid])
+            else:
+                a=True
+    with open(acces,"w",newline="") as f:
+        csv.writer(f).writerows(r)
+    
+    await interaction.response.send_message(f"remove access from {user.name}" if not a else "didnt have anw")
+    
+  
+
 @bot.tree.command(name="toggle", description="Toggle bot on/off")
 @app_commands.checks.has_permissions(administrator=True)
 async def toggle(interaction: discord.Interaction):
@@ -332,7 +400,7 @@ async def configcustom(interaction:discord.Interaction,model:str,apikey:str):
     
 #default config
     
-bot.tree.command(name="configdefault",description="Setup configuration to be default")
+@bot.tree.command(name="configdefault",description="Setup configuration to be default")
 @app_commands.checks.has_permissions(administrator=True)
 async def configdefault(interaction:discord.Interaction):
 
@@ -344,12 +412,31 @@ async def configdefault(interaction:discord.Interaction):
 async def help(interaction:discord.Interaction):
     await interaction.response.send_message(
         '''
+        # Commands 
+        /help -This command
+        /configcustom -Setups up a configuration for specific ai model -requires hugginface api key and modelname
+        /configdefault- Makes server go back to default configuration
+        /giveacc- Gives acces in server to let sm1 Talk to ai
+        /removeacc -Removes Acesss
+        /Toggle -Toggles ai on and off
+        /add - Gives link to add to server or user 
+        
         
         
         
         '''
         
     )
+    
+@bot.tree.command(name="add",description='Get bot adding linkws')
+async def add(interaction:discord.Interaction):
+    await interaction.response.send_message(
+        "Server link-",
+        "user link",ephemeral=True
+        
+    )
+
+
         
 
     
