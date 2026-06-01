@@ -56,6 +56,7 @@ A Discord AI powered bot running through Hugging Face's Inteference Api, with pe
 ## Demo
 
     https://discord.gg/x4E59MvzH
+    ![alt text](image.png)
 
 
 ## Contributing
