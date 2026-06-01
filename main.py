@@ -29,7 +29,8 @@ Intents.message_content = True
 # Files
 acces="acces.csv"
 logs="logs.csv" #incase of misuse/inapropriate useage
-toggle="toggle.csv"# form of serverid,on/off
+togglefile="toggle.csv"# form of serverid,on/off
+serverconfig="config.csv" # serverid,modelname,apikey
 #File Functions
 
 
@@ -47,6 +48,17 @@ def lacces():
     except: pass
     return data
 
+def ltoggle():
+    try:
+        with open(togglefile) as f:
+            return {int(line.strip()) for line in f if line.strip()}
+    except: return set()
+def stoggle(c):
+    with open(togglefile,"w") as f:
+        for gid in c:
+            f.write(f"{gid}\n")
+            
+        
 # De-appreciated Functions
 '''
 
@@ -117,8 +129,7 @@ def aiconvo(prompt:str,interaction=None,message=None):
 
 #   hf("You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {guild_name} in channel of{channel_name}  talking to user and user is {user_name}")
 
-def gemini():
-    return ""
+
 
 
 
@@ -189,10 +200,14 @@ async def on_message(message):
     guid=message.guild.id
     uid=message.author.id
     allowed = lacces()
+    enabled = ltoggle()
+    if  not bot.user.mentioned_in(message): return
+
+    if message.guild.id not in enabled: return
     if message.author.guild_permissions.administrator: pass
 
-    elif uid not in allowed[guid] or guid not in allowed:
-        return
+    elif uid not in allowed.get(guid, set()): return
+
     print("hiii")
     history = []
 
@@ -222,21 +237,59 @@ async def on_message(message):
     async with message.channel.typing():
         try:
             response = await  hf(
-                "You are a helpful AI made by Chaitanya.You are to act knowledgable and funny and know about memes and cultural references.You woll reply in less then 500 charascters and in discord foramat","",
+                "You are an ai made by chaitanya.You are to act knowledgable and funny and know about memes and cultural references.You woll reply in less then 500 charascters and in discord foramat. MSG HAS TO BE TEXT TYPE NOT.A FULL PHARSAGRAP/ESSAY AT MAX 400 CHARACTERS PER UNLESS EXPICIILTY ASKED PLS  DONT SEND LONG MSGS","",
                 prompt
             )
 
             if not response:
                 response = "erorr with response"
 
-            if len(response) > 2000:
-                response = response[:1990] + "..."
+            if len(response) > 500: response = response[:500] + "bot tried giving to much msg :c"
 
             await message.reply(response)
 
-        except Exception as e:
-            await message.reply(f"Error: {e}")
+        except:
+            await message.reply("error ")
+            
+            
+# Discord Commands
 
+@bot.tree.command(name="giveacc",description="gives acces")
+@app_commands.checks.has_permissions(administrator=True)
+async def giveacc(interaction: discord.Interaction, user: discord.User):
+    with open(acces,"a",newline="") as f:
+        csv.writer(f).writerow([interaction.guild.id,user.id])
+        await interaction.response.send_message("Done")
+        
+        
+@bot.tree.command(name="removeacc",description="removes acces")
+@app_commands.checks.has_permissions(administrator=True)
+async def removeacc(interaction: discord.Interaction, user: discord.User):
+    r=[]
+    with open(acces,newline="") as f:
+        for gid,uid in csv.reader(f):
+            if not (int(gid) == interaction.guild.id and int(uid) == user.id):
+                r.append([gid,uid])
+            else:
+                await interaction.response.send_message("They didnt have")
+    with open(acces,"w",newline="") as f:
+        csv.writer(f).writerows(r)
+    await interaction.response.send_message("Done")
+ 
+@bot.tree.command(name="toggle", description="Toggle bot on/off")
+@app_commands.checks.has_permissions(administrator=True)
+async def toggle(interaction: discord.Interaction):
+    enabled = ltoggle()
+    gid = interaction.guild.id
+    if gid in enabled:
+        enabled.remove(gid)
+        s = "off"
+    else:
+        enabled.add(gid)
+        s= "on"
+    stoggle(enabled)
+    await interaction.response.send_message(f"its now {s}")
+        
 bot.run(discordtoken)   
         
       
