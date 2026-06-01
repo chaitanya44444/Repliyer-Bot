@@ -16,8 +16,6 @@ discordtoken = os.getenv("discordtoken")
 hf_api = os.getenv("hf_api")
 
 
-
-
 # SETTING UP DISCORD
 Intents=discord.Intents.default()
 Intents.messages = True
@@ -30,7 +28,7 @@ Intents.message_content = True
 acces="acces.csv"
 logs="logs.csv" #incase of misuse/inapropriate useage
 togglefile="toggle.csv"# form of serverid,on/off
-serverconfig="config.csv" # serverid,modelname,apikey
+configfile="config.csv" # serverid,modelname,apikey
 #File Functions
 
 
@@ -58,7 +56,28 @@ def stoggle(c):
         for gid in c:
             f.write(f"{gid}\n")
             
-        
+def lconfig():
+    d={}
+    try:
+        with open(configfile,newline="") as f:
+            for gid,model,key,prompt in csv.reader(f):
+                d[int(gid)]={"model":model,"apikey":key,"prompt":prompt}
+    except: pass
+    return d
+def sconfig(gid,model,key,prompt):
+    d=lconfig()
+    d[gid]={"model":model,"apikey":key,"prompt":prompt}
+    
+    try:
+        with open(configfile,"w",newline="") as f:
+            writer=csv.writer(f)
+            for gid,config in d.items():
+                writer.writerow([gid,config["model"],config["apikey"],config["prompt"]])
+    except: print("error at scofnig")
+                
+            
+    
+                      
 # De-appreciated Functions
 '''
 
@@ -289,6 +308,53 @@ async def toggle(interaction: discord.Interaction):
         s= "on"
     stoggle(enabled)
     await interaction.response.send_message(f"its now {s}")
+
+
+
+
+
+
+
+#custom config
+
+@bot.tree.command(name="configcustom",description="Setup configuration for custom response")
+@app_commands.checks.has_permissions(administrator=True)
+async def configcustom(interaction:discord.Interaction,model:str,apikey:str):
+    if not model: 
+        await interaction.response.send_message("No model chosne")
+        return
+    if not apikey:  
+        await interaction.response.send_message("no api key given")
+        return
+    sconfig(interaction.guild.id,model,apikey,"")
+    await interaction.response.send_message(f"{model} chosen")
+    
+    
+#default config
+    
+bot.tree.command(name="configdefault",description="Setup configuration to be default")
+@app_commands.checks.has_permissions(administrator=True)
+async def configdefault(interaction:discord.Interaction):
+
+    sconfig( interaction.guild.id,"google/gemma-4-31B-it",hf_api,"")
+    await interaction.response.send_message(f"default chosen")
+
+   
+@bot.tree.command(name="help",description="Helps Provide u with Information to use the bot")      
+async def help(interaction:discord.Interaction):
+    await interaction.response.send_message(
+        '''
+        
+        
+        
+        '''
+        
+    )
+        
+
+    
+    
+
         
 bot.run(discordtoken)   
         
