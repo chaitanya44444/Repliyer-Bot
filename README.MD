@@ -3,7 +3,6 @@
 
 A Discord AI powered bot running through Hugging Face's Inteference Api, with per-server configurations, access and revocation commands, and management.
 
-
 # SETUP
 
 1.  Will require [python](https://www.python.org/downloads/)
