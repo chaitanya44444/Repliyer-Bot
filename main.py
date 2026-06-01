@@ -5,13 +5,13 @@ import requests
 import asyncio
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 # TOKENS/API KEYS
 load_dotenv()
 discordtoken = os.getenv("discordtoken")
 hf_api = os.getenv("hf_api")
+
 if (not discordtoken) or (not hf_api):
     print("MISSING DETAILS -hf_api or discordtoken")
     
@@ -24,11 +24,11 @@ Intents.guilds = True
 Intents.message_content = True
 
 
-# Files
-acces="site/acces.csv"
-logs="site/logs.csv" #incase of misuse/inapropriate useage
-togglefile="site/toggle.csv"# form of serverid,on/off
-configfile="site/config.csv" # serverid,modelname,apikey
+# filess
+acces="files/acces.csv"
+logs="files/logs.csv" #incase of misuse/inapropriate useage
+togglefiles="files/toggle.csv"# form of serverid,on/off
+configfiles="files/config.csv" # serverid,modelname,apikey
 
 
 
@@ -56,7 +56,7 @@ def lacces():
 
 def ltoggle():
     try:
-        with open(togglefile) as f:
+        with open(togglefiles) as f:
             return {int(line.strip()) for line in f if line.strip()}
     except: return set()
     
@@ -64,7 +64,7 @@ def ltoggle():
     
     
 def stoggle(c):
-    with open(togglefile,"w") as f:
+    with open(togglefiles,"w") as f:
         for gid in c:
             f.write(f"{gid}\n")
             
@@ -74,7 +74,7 @@ def stoggle(c):
 def lconfig():
     d={}
     try:
-        with open(configfile,newline="") as f:
+        with open(configfiles,newline="") as f:
             for gid,model,key,prompt in csv.reader(f):
                 d[int(gid)]={"model":model,"apikey":key,"prompt":prompt}
     except: pass
@@ -87,7 +87,7 @@ def sconfig(gid,model,key,prompt):
     d[gid]={"model":model,"apikey":key,"prompt":prompt}
     
     try:
-        with open(configfile,"w",newline="") as f:
+        with open(configfiles,"w",newline="") as f:
             writer=csv.writer(f)
             for gid,config in d.items():
                 writer.writerow([gid,config["model"],config["apikey"],config["prompt"]])
@@ -203,9 +203,8 @@ async def hf(a,systemp,prompt,modelname="google/gemma-4-31B-it",apikey=hf_api):
     json=payload,
     timeout=90
     )
-
     if req.status_code != 200:
-        print(req.text)
+
         return "error"
 
     return req.json()["choices"][0]["message"]["content"]
@@ -235,7 +234,7 @@ def logit(prompt:str,output:str,model:str,guild_name: str = "DM",guild_id: str =
 async def on_message(message):
 
     
-    print("hi")
+    #print("hi")
     if message.author.bot:
         return
 
@@ -244,8 +243,12 @@ async def on_message(message):
     
     configer=configes.get(guid)
     if configer:
-        modelc = configer["model"]
-        apikeyc = configer["apikey"]
+        modelc = configer.get("model") 
+        apikeyc = configer.get("apikey") 
+
+    else:
+        modelc = "google/gemma-4-31B-it" #wasted 20 mins doing ts man
+        apikeyc = hf_api
 
     uid=message.author.id
     allowed = lacces()
@@ -256,9 +259,9 @@ async def on_message(message):
     if message.author.guild_permissions.administrator: pass
 
     elif uid not in allowed.get(guid, set()): return
-    sysprompt=f"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {message.guild.name} in channel of{message.channel.name}  talking to user and user is {message.author.name}"
+    sysprompt=f"You are a helpful ai made by chaitanya,U are Not apart of any meta/nvidia/any company.You Are to act as a chill Knowledable person kind of like a PHD holder,Your answers should be cool,chill and knowledgable and fitting in rather then robotic.Also Discord info ur in server {message.guild.name} in channel of{message.channel.name}  talking to user and user is {message.author.name} dont be  repetetive also man speak in discord format and anything to be in discord  ui/uxway only also max 1000 characters only try to be concise and more discordy dont always say tteir name also" 
 
-    print("hiii")
+    #print("hiii")
     history = []
 
     current = message
@@ -301,7 +304,7 @@ async def on_message(message):
 
             if not response:response = "erorr with response"
 
-            if len(response) > 500: response = response[:500] + "bot tried giving to much msg :c"
+            if len(response) > 1000: response = response[:1000] + "ask me for more"
 
             await message.reply(response)
 
@@ -410,8 +413,9 @@ async def configdefault(interaction:discord.Interaction):
    
 @bot.tree.command(name="help",description="Helps Provide u with Information to use the bot")      
 async def help(interaction:discord.Interaction):
-    await interaction.response.send_message(
-        '''
+    embed = discord.Embed(
+    title="Help",
+    description=        '''
         # Commands 
         /help -This command
         /configcustom -Setups up a configuration for specific ai model -requires hugginface api key and modelname
@@ -419,25 +423,31 @@ async def help(interaction:discord.Interaction):
         /giveacc- Gives acces in server to let sm1 Talk to ai
         /removeacc -Removes Acesss
         /Toggle -Toggles ai on and off
-        /add - Gives link to add to server or user 
+        /add - Gives link to add to server invite for bot
+        #Also
+        U can right click on people to give and remove access with apps
         
         
         
         
-        '''
-        
-    )
+        ''',
+    timestamp=datetime.now()
+)
+    await interaction.response.send_message(embed=embed)
     
 @bot.tree.command(name="add",description='Get bot adding linkws')
 async def add(interaction:discord.Interaction):
     await interaction.response.send_message(
-        "Server link-",
-        "user link",ephemeral=True
+        f"Server Invite link- https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=448824200272&scope=bot%20applications.commands",ephemeral=True
         
     )
 
 
-        
+@bot.event
+async def on_ready():
+    print(f"Server Invite link- https://discord.com/api/oauth2/authorize?client_id={bot.user.id}&permissions=448824200272&scope=bot%20applications.commands")     
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="Lets Talk it"))
+   
 
     
     
